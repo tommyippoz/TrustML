@@ -183,7 +183,7 @@ class SPROUTObject:
         self.trust_calculators.append(
             MultiCombinedUncertainty(clf_set=clf_set, x_train=x_train, y_train=y_train, norm=n_classes))
 
-    def add_calculator_neighbour(self, x_train, y_train, label_names, k=2):
+    def add_calculator_neighbour(self, x_train, y_train, label_names, k=19):
         """
         Neighbour-based Trust Calculator (CM6 in the paper)
         :param x_train: features in the train set

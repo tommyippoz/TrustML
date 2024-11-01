@@ -157,7 +157,7 @@ class NeighborsUncertainty(UncertaintyCalculator):
         try:
             self.n_neighbors = int(k)
         except:
-            self.n_neighbors = 2
+            self.n_neighbors = 19
         self.labels = labels
 
     def save_params(self, main_folder, tag):

@@ -6,7 +6,6 @@ import pandas as pd
 from torchvision.transforms import ToTensor
 import numpy as np
 import os
-print("Test")
 class CustomDataset(Dataset):
     def __init__(self, data_dir, transform=None):
         self.data_dir = data_dir
@@ -166,8 +165,10 @@ class GenericDatasetLoader:
         if self.csv_file is None and self.data_frame is None:
             if split == 'train':
                 dataset = CustomDataset(data_dir=self.root_dir + '/train', transform=self.transform)
-            else:
+            elif split == 'test':
                 dataset = CustomDataset(data_dir=self.root_dir + '/test', transform=self.transform)
+            else:
+                dataset = CustomDataset(data_dir=self.root_dir + '/val', transform=self.transform)
                 # dataset = CustomSVMDataSet(data_dir=self.root_dir + '/test', transform=self.transform)
             return dataset
         else:

@@ -167,8 +167,8 @@ class ImageClassifier(pl.LightningModule, Model):
         outputs = self(inputs)
         loss = self.criterion(outputs, labels)
         acc = (outputs.argmax(dim=1) == labels).float().mean()
-        self.log('val_loss', loss)
-        self.log('val_acc', acc)
+        self.log('val_loss', loss,prog_bar=True)
+        self.log('val_acc', acc,prog_bar=True)
         return {'val_loss': loss, 'val_acc': acc}
 
     def configure_optimizers(self):
@@ -194,7 +194,7 @@ class ImageClassifier(pl.LightningModule, Model):
         """
 
         # Create the PyTorch Lightning Trainer
-        trainer = pl.Trainer(max_epochs=self.max_epochs,callbacks=[EarlyStopping(monitor="train_loss", mode="min")])
+        trainer = pl.Trainer(max_epochs=self.max_epochs,callbacks=[EarlyStopping(monitor="train_loss", mode="max", patience=5,verbose=True)])
 
         # Fit the model using the trainer and dataloaders
         if val_dataloader is not None:
