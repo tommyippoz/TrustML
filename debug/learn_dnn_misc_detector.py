@@ -37,6 +37,8 @@ from sprout.utils.dataset_utils import process_tabular_dataset, process_image_da
 from sprout.utils.general_utils import load_config, clean_name, current_ms, clear_folder
 from sprout.utils.sprout_utils import build_SPROUT_dataset
 from torch.utils.data import DataLoader, Subset
+import sys
+sys.path.append('/home/fahadk/anaconda3/envs/SPROUT/lib/python3.8/site-packages/confens/')
 
 # The folder where to put the new misclassification detector
 MODELS_FOLDER = "../models/"
@@ -45,7 +47,7 @@ TMP_FOLDER = "tmp"
 # The name of the new misclassification detector
 MODEL_TAG = "dnn_misc_detector"
 # The folder from which image datasets are gonna be loaded
-TRAIN_DATA_FOLDER = "/home/fahad/Project/SPROUT/dataset/imagenet/"
+TRAIN_DATA_FOLDER = "/home/fahadk/Project/SPROUT/dataset/"
 # This is to down-sample or over-sample the percentage of misclassified predictions
 # in the training set of the misclassification detector
 MISC_RATIOS = [None, 0.05, 0.1, 0.2, 0.3]
@@ -56,7 +58,9 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #Number of Classes
 NUM_CLASSES = 15
 #Number of Epochs
-MAX_EPOCHS = 100
+MAX_EPOCHS = 20
+#Checkpoint Path
+CHECKPOINT_PATH = 'checkpoints/'
 # -------------------------------------------------------------------------------------------------------
 # FUNCTIONS THAT YOU HAVE TO IMPLEMENT
 
@@ -104,13 +108,17 @@ def read_image_dataset(dataset_file):
         transforms.Resize((304, 304)),
         transforms.ToTensor(),
         # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        # transforms.Normalize((0.5,), (0.5,))
+        transforms.Normalize((0.5,), (0.5,))
     ])
     custom_data = GenericDatasetLoader(dataset_name=dataset_file, root_dir = TRAIN_DATA_FOLDER, transform= transform, batch_size=8)
 
     train_loader = custom_data.create_dataloader(split='train')
 
     test_loader = custom_data.create_dataloader(split='test')
+
+    # val_loader = custom_data.create_dataloader(split='val')
+
+    val_loader = None
 
     y_test = custom_data.extract_labels(test_loader)
 
@@ -122,7 +130,7 @@ def read_image_dataset(dataset_file):
     NUM_CLASSES= len(label_tags)
 
     # return train_loader, test_loader, X_train, X_test, y_train, y_test, label_tags
-    return train_loader, test_loader, y_test, label_tags
+    return train_loader, test_loader, val_loader, y_test, label_tags
 
 
 def list_image_datasets():
@@ -154,7 +162,7 @@ def compute_datasets_uncertainties():
 
             # Reading Dataset
             # train_loader, test_loader,x_train, x_test, y_train, y_test, label_tags = read_image_dataset(dataset_file)
-            train_loader, test_loader, y_test, label_tags = read_image_dataset(dataset_file)
+            train_loader, test_loader, val_loader, y_test, label_tags = read_image_dataset(dataset_file)
 
 
             print("Preparing Uncertainty Calculators...")
@@ -245,14 +253,14 @@ def build_supervised_object(x_train, y_train, label_tags):
     # sp_obj.add_calculator_confidence(x_train=x_data, y_train=y_train, confidence_level=0.9)
     # UM2
     sp_obj.add_calculator_maxprob()
-    # # # UM3
+    # # UM3
     sp_obj.add_calculator_entropy(n_classes=len(label_tags))
     # # # UM9
     sp_obj.add_calculator_recloss(x_train=x_train,num_classes=len(label_tags))
     # #
     sp_obj.add_calculator_combined(classifier= classifier[0], x_train=x_train,y_train = y_train, n_classes=len(label_tags))
     sp_obj.add_calculator_multicombined(clf_set=classifier, x_train=x_train, y_train=y_train, n_classes=len(label_tags))
-    sp_obj.add_calculator_neighbour(x_train=x_train,y_train=y_train,label_names = label_tags)
+    # sp_obj.add_calculator_neighbour(x_train=x_train,y_train=y_train,label_names = label_tags)
     return sp_obj
 
 

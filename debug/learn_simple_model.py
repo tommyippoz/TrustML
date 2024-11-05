@@ -24,6 +24,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 
+from plmodels import *
+
 from sprout.SPROUTObject import SPROUTObject
 from sprout.classifiers.Classifier import LogisticReg, get_classifier_name, build_classifier, choose_classifier, \
     UnsupervisedClassifier
@@ -34,13 +36,14 @@ from sprout.utils.sprout_utils import build_SPROUT_dataset
 
 # Vars for Generating Uncertainties
 FILE_AVOID_TAG = None
-MODEL_TYPE = 'UNS'
+MODEL_TYPE = 'SUP'
 GENERATE_UNCERTAINTIES = False
 
 # Vars for Learning Model
 MODELS_FOLDER = "../models/"
 STUDY_TAG = {
     "uns_all": "./datasets_measures/unsup/all",
+    "s_all": "/home/fahadk/Project/SPROUT/debug/tmp/",
     #"uns_bin": "./datasets_measures/unsup/bindatasets",
     #"uns_multi": "./datasets_measures/unsup/nonbindatasets",
 }
@@ -242,8 +245,39 @@ def build_unsupervised_object(x_train, contamination):
         sp_obj.add_calculator_multicombined(clf_set=cc, x_train=x_data, y_train=None, n_classes=2)
     sp_obj.add_calculator_recloss(x_train=x_data)
     return sp_obj
+def get_list_del_classifiers():
+    """
+    This should return a classifier objects (Model objects in your code) that you want to use as a checker classifier.
+    :return: a classifier object
+    """
+    models = []
+    model_name = ['vgg11','densenet121','googlenet','inception_v3','resnet50', 'alexnet']
+    for model in model_name:
+        model = ImageClassifier(model_name=model, num_classes=NUM_CLASSES, learning_rate=1e-3, max_epochs=MAX_EPOCHS)
+        models.append(model)
+    return models
 
-
+def build_supervised_object(x_train, y_train, label_tags):
+    sp_obj = SPROUTObject(models_folder=MODELS_FOLDER)
+    classifier = get_list_del_classifiers()
+    # if (x_train is not None) and isinstance(x_train, pandas.DataFrame):
+    #     x_data = x_train.to_numpy()
+    # else:
+    #     x_data = x_train
+    # # Add UM as much as possible
+    # UM1
+    # sp_obj.add_calculator_confidence(x_train=x_data, y_train=y_train, confidence_level=0.9)
+    # UM2
+    sp_obj.add_calculator_maxprob()
+    # # # UM3
+    sp_obj.add_calculator_entropy(n_classes=len(label_tags))
+    # # # UM9
+    sp_obj.add_calculator_recloss(x_train=x_train,num_classes=len(label_tags))
+    # #
+    sp_obj.add_calculator_combined(classifier= classifier[0], x_train=x_train,y_train = y_train, n_classes=len(label_tags))
+    sp_obj.add_calculator_multicombined(clf_set=classifier, x_train=x_train, y_train=y_train, n_classes=len(label_tags))
+    # sp_obj.add_calculator_neighbour(x_train=x_train,y_train=y_train,label_names = label_tags)
+    return sp_obj
 if __name__ == '__main__':
     """
     Main to calculate trust measures for many datasets using many classifiers.
@@ -261,13 +295,13 @@ if __name__ == '__main__':
         compute_datasets_uncertainties(dataset_files, dataset_folder, sprout_folder,
                                        sup_clfs if MODEL_TYPE == 'SUP' else uns_clfs,
                                        y_label, limit_rows)
-    if MODEL_TYPE == 'SUP':
-        sprout_obj = build_supervised_object(None, None, None)
-    else:
-        sprout_obj = build_unsupervised_object(None, 0.1)
-
-    sprout_obj.add_calculator_bagging(base_clf=None, x_train=None, y_train=None)
-    sprout_obj.add_calculator_boosting(base_clf=None, x_train=None, y_train=None)
+    # if MODEL_TYPE == 'SUP':
+    #     sprout_obj = build_supervised_object(None, None, None)
+    # else:
+    #     sprout_obj = build_unsupervised_object(None, 0.1)
+    #
+    # sprout_obj.add_calculator_bagging(base_clf=None, x_train=None, y_train=None)
+    # sprout_obj.add_calculator_boosting(base_clf=None, x_train=None, y_train=None)
 
     for tag, folder_path in STUDY_TAG.items():
 
@@ -278,7 +312,7 @@ if __name__ == '__main__':
         if os.path.exists(folder_path):
             # Merging data into a unique Dataset for training Misclassification Predictors
             x_train, y_train, x_test, y_test, features, m_frac = \
-                load_uncertainty_datasets(folder_path, train_split=0.75, perf_thr=0.7)
+                load_uncertainty_datasets(folder_path, train_split=0.75, perf_thr=0.6)
 
             # Classifiers for Detection (Binary Adjudicator)
             m_frac = 0.5 if m_frac > 0.5 else m_frac

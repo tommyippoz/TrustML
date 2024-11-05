@@ -61,7 +61,7 @@ class CustomCSVDataset(Dataset):
         return image, label
 
 class GenericDatasetLoader:
-    def __init__(self, dataset_name = None, root_dir='', transform = None, batch_size=1, shuffle=True, csv_file = None, data_frame = None,**kwargs):
+    def __init__(self, dataset_name = None, root_dir='', transform = None, batch_size=1, shuffle=False, csv_file = None, data_frame = None,**kwargs):
         self.dataset_name = dataset_name
         self.root_dir = root_dir
         self.transform = transform
