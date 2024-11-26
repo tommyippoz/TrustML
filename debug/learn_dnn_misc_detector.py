@@ -24,6 +24,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.naive_bayes import GaussianNB, MultinomialNB, BernoulliNB, ComplementNB
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
+
 from plmodels import *
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
@@ -47,7 +48,7 @@ TMP_FOLDER = "tmp"
 # The name of the new misclassification detector
 MODEL_TAG = "dnn_misc_detector"
 # The folder from which image datasets are gonna be loaded
-TRAIN_DATA_FOLDER = "/home/fahadk/Project/SPROUT/dataset/"
+TRAIN_DATA_FOLDER = "/home/fahadk/Project/SPROUT/dataset/FER2013"
 # This is to down-sample or over-sample the percentage of misclassified predictions
 # in the training set of the misclassification detector
 MISC_RATIOS = [None, 0.05, 0.1, 0.2, 0.3]
@@ -56,9 +57,9 @@ CHANNELS = 0
 # Check if CUDA is available
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #Number of Classes
-NUM_CLASSES = 15
+NUM_CLASSES = 9
 #Number of Epochs
-MAX_EPOCHS = 20
+MAX_EPOCHS = 50
 #Checkpoint Path
 CHECKPOINT_PATH = 'checkpoints/'
 # -------------------------------------------------------------------------------------------------------
@@ -70,9 +71,9 @@ def get_dnn_classifiers():
     :return: a list of classifier objects
     """
     models = []
-    model_name = ['vgg11','densenet121','googlenet','inception_v3','resnet50', 'alexnet']
+    model_name = ['VGG11','DenseNet121','GoogLeNet','Inception_V3','ResNet50', 'AlexNet']
     for model in model_name:
-        model = ImageClassifier(model, num_classes=NUM_CLASSES, learning_rate=1e-3, max_epochs=MAX_EPOCHS)
+        model = ImageClassifier(model, num_classes=NUM_CLASSES, learning_rate=1e-4, max_epochs=MAX_EPOCHS)
         models.append(model)
     return models
 
@@ -81,7 +82,7 @@ def get_del_classifiers():
     This should return a classifier objects (Model objects in your code) that you want to use as a checker classifier.
     :return: a classifier object
     """
-    model = ImageClassifier('alexnet', num_classes=NUM_CLASSES, learning_rate=1e-3, max_epochs=MAX_EPOCHS)
+    model = ImageClassifier('AlexNet', num_classes=NUM_CLASSES, learning_rate=1e-4, max_epochs=MAX_EPOCHS)
 
     return model
 
@@ -91,9 +92,9 @@ def get_list_del_classifiers():
     :return: a classifier object
     """
     models = []
-    model_name = ['vgg11','densenet121','googlenet','inception_v3','resnet50', 'alexnet']
+    model_name = ['VGG11','DenseNet121','GoogLeNet','Inception_V3','ResNet50', 'AlexNet']
     for model in model_name:
-        model = ImageClassifier(model_name=model, num_classes=NUM_CLASSES, learning_rate=1e-3, max_epochs=MAX_EPOCHS)
+        model = ImageClassifier(model_name=model, num_classes=NUM_CLASSES, learning_rate=1e-4, max_epochs=MAX_EPOCHS)
         models.append(model)
     return models
 def read_image_dataset(dataset_file):
@@ -104,21 +105,31 @@ def read_image_dataset(dataset_file):
     :param dataset_file: the input you need to understand which dataset (and how) you have to read
     :return: x_train, y_train, x_test, y_test, labels
     """
-    transform = transforms.Compose([
-        transforms.Resize((304, 304)),
+    train_transform = transforms.Compose([
+        transforms.Resize((320,320)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(30),
+        transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
         transforms.ToTensor(),
-        # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        transforms.Normalize((0.5,), (0.5,))
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    custom_data = GenericDatasetLoader(dataset_name=dataset_file, root_dir = TRAIN_DATA_FOLDER, transform= transform, batch_size=8)
 
-    train_loader = custom_data.create_dataloader(split='train')
+    test_transform = transforms.Compose([
+        transforms.Resize((320, 320)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
 
-    test_loader = custom_data.create_dataloader(split='test')
 
-    # val_loader = custom_data.create_dataloader(split='val')
+    custom_data = GenericDatasetLoader(dataset_name=dataset_file, root_dir = TRAIN_DATA_FOLDER, batch_size=32)
 
-    val_loader = None
+    train_loader = custom_data.create_dataloader(split='train', transform=train_transform, shuffle=True)
+
+    test_loader = custom_data.create_dataloader(split='test', transform=test_transform, shuffle=False)
+
+    val_loader = custom_data.create_dataloader(split='test', transform=test_transform, shuffle = False)
+
+    # val_loader = None
 
     y_test = custom_data.extract_labels(test_loader)
 
@@ -139,7 +150,7 @@ def list_image_datasets():
     One item per dataset
     :return:
     """
-    dataset_name = ['CIFAR10']
+    dataset_name = ['CUSTOM']
     return dataset_name
 
 # -------------------------------------------------------------------------------------------------------
@@ -166,13 +177,13 @@ def compute_datasets_uncertainties():
 
 
             print("Preparing Uncertainty Calculators...")
-            sp_obj = build_supervised_object(train_loader, test_loader, label_tags)
+            sp_obj = build_supervised_object(train_loader, test_loader,val_loader, label_tags)
 
             for classifier in get_dnn_classifiers():
                 sprout_obj = copy.deepcopy(sp_obj)
                 # Building and exercising classifier
-                print(DEVICE)
-                classifier.fit(train_dataloader = train_loader)
+                # print(DEVICE)
+                classifier.fit(train_dataloader = train_loader, val_dataloader= val_loader)
                 # classifier.load_model('/home/fahad/Project/SPROUT/debug/tmp/ResNet_0_model_weights.pth')
                 y_proba = classifier.predict_proba(test_loader)
                 y_pred = classifier.predict(test_loader)
@@ -241,7 +252,7 @@ def load_uncertainty_datasets(train_split=0.5, avoid_tags=[], perf_thr=None,
 
 # Here you have to define your SPROUT object, or rather the uncertainty measures you want to use
 # Sume UM are alreay there, you can change them at will
-def build_supervised_object(x_train, y_train, label_tags):
+def build_supervised_object(x_train, y_train, val_train, label_tags):
     sp_obj = SPROUTObject(models_folder=MODELS_FOLDER)
     classifier = get_list_del_classifiers()
     # if (x_train is not None) and isinstance(x_train, pandas.DataFrame):
@@ -256,10 +267,10 @@ def build_supervised_object(x_train, y_train, label_tags):
     # # UM3
     sp_obj.add_calculator_entropy(n_classes=len(label_tags))
     # # # UM9
-    sp_obj.add_calculator_recloss(x_train=x_train,num_classes=len(label_tags))
+    sp_obj.add_calculator_recloss(x_train=x_train,val_train=val_train, num_classes=len(label_tags))
     # #
-    sp_obj.add_calculator_combined(classifier= classifier[0], x_train=x_train,y_train = y_train, n_classes=len(label_tags))
-    sp_obj.add_calculator_multicombined(clf_set=classifier, x_train=x_train, y_train=y_train, n_classes=len(label_tags))
+    sp_obj.add_calculator_combined(classifier= classifier[0], x_train=x_train,y_train = y_train, val_train= val_train,n_classes=len(label_tags))
+    sp_obj.add_calculator_multicombined(clf_set=classifier, x_train=x_train, y_train=y_train,val_train= val_train, n_classes=len(label_tags))
     # sp_obj.add_calculator_neighbour(x_train=x_train,y_train=y_train,label_names = label_tags)
     return sp_obj
 

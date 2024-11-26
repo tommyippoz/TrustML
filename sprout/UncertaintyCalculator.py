@@ -359,7 +359,7 @@ class CombinedUncertainty(UncertaintyCalculator):
     It uses the main classifier plus the additional classifier to calculate an unified confidence score
     """
 
-    def __init__(self, del_clf, x_train, y_train=None, norm=2):
+    def __init__(self, del_clf, x_train, y_train=None,val_train=None, norm=2):
         self.del_clf = del_clf
         self.u_measure = EntropyUncertainty(norm)
         if x_train is not None:
@@ -374,7 +374,7 @@ class CombinedUncertainty(UncertaintyCalculator):
                 if not isinstance(x_train, DataLoader):
                     self.del_clf.fit(x_train, y_train)
                 else:
-                    self.del_clf.fit(x_train)
+                    self.del_clf.fit(x_train,val_train)
             print("[Combineduncertainty] Fitting of '" + get_classifier_name(del_clf) + "' Completed in " +
                   str(current_ms() - start_time) + " ms")
         else:
@@ -430,12 +430,12 @@ class MultiCombinedUncertainty(UncertaintyCalculator):
     It uses the main classifier plus the additional classifier to calculate an unified confidence score
     """
 
-    def __init__(self, clf_set, x_train, y_train=None, norm=2):
+    def __init__(self, clf_set, x_train, y_train=None, val_train =None , norm=2):
         self.uncertainty_set = []
         self.tag = ""
         start_time = current_ms()
         for clf in clf_set:
-            self.uncertainty_set.append(CombinedUncertainty(clf, x_train, y_train, norm))
+            self.uncertainty_set.append(CombinedUncertainty(clf, x_train, y_train, val_train, norm))
             self.tag = self.tag + get_classifier_name(clf)[0] + get_classifier_name(clf)[-1]
         self.tag = str(len(self.uncertainty_set)) + " - " + self.tag
         print("[MultiCombineduncertainty] Fitting of " + str(len(clf_set)) + " classifiers completed in "
@@ -928,9 +928,10 @@ class ReconstructionLoss(UncertaintyCalculator):
     Defines an uncertainty measure that uses the reconstruction error of an autoencoder as uncertainty measure.
     """
 
-    def __init__(self, dataloader,num_classes, enc_tag: str = 'conv'):
+    def __init__(self, dataloader,val_train,num_classes, enc_tag: str = 'conv'):
         self.ae = None
         self.num_classes = num_classes
+        self.val_train = val_train
         self.enc_tag = enc_tag
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -940,11 +941,11 @@ class ReconstructionLoss(UncertaintyCalculator):
             _, channels, _, _ = x_train.shape
             # print("Channels is the Function ",channels)
             if enc_tag == 'conv':
-                self.ae = plmodels.ConvAutoEncoder(max_epochs=2).to(self.device)
+                self.ae = plmodels.ConvAutoEncoder(max_epochs=20).to(self.device)
             else:
                 raise ValueError(f"Unsupported encoder type: {enc_tag}")
 
-        self.ae.fit(dataloader)
+        self.ae.fit(train_dataloader=dataloader)
 
     def save_params(self, main_folder, tag):
         """

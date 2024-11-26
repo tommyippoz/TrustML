@@ -161,7 +161,7 @@ class SPROUTObject:
             self.trust_calculators.append(
                 ExternalSupervisedUncertainty(del_clf=classifier, x_train=x_train, y_train=y_train, norm=n_classes))
 
-    def add_calculator_combined(self, classifier, x_train, y_train, n_classes):
+    def add_calculator_combined(self, classifier, x_train, y_train,val_train, n_classes):
         """
         Combined Trust Calculator (CM4 in the paper)
         :param classifier: classifier to be used as del_clf
@@ -170,9 +170,9 @@ class SPROUTObject:
         :param n_classes: number of classes of the label
         """
         self.trust_calculators.append(
-            CombinedUncertainty(del_clf=classifier, x_train=x_train, y_train=y_train, norm=n_classes))
+            CombinedUncertainty(del_clf=classifier, x_train=x_train, y_train=y_train,val_train= val_train, norm=n_classes))
 
-    def add_calculator_multicombined(self, clf_set, x_train, y_train, n_classes):
+    def add_calculator_multicombined(self, clf_set, x_train, y_train,val_train, n_classes):
         """
         Multi-Combined Trust Calculator (CM5 in the paper)
         :param clf_set: classifiers (array) to be used as del_clf
@@ -181,7 +181,7 @@ class SPROUTObject:
         :param n_classes: number of classes of the label
         """
         self.trust_calculators.append(
-            MultiCombinedUncertainty(clf_set=clf_set, x_train=x_train, y_train=y_train, norm=n_classes))
+            MultiCombinedUncertainty(clf_set=clf_set, x_train=x_train, y_train=y_train, val_train = val_train, norm=n_classes))
 
     def add_calculator_neighbour(self, x_train, y_train, label_names, k=19):
         """
@@ -213,13 +213,13 @@ class SPROUTObject:
             ConfidenceBoostingUncertainty(base_clf, x_train, y_train, n_base, learning_rate, sampling_ratio,
                                           contamination, conf_thr, n_classes))
 
-    def add_calculator_recloss(self, x_train, num_classes, tag='conv'):
+    def add_calculator_recloss(self, x_train, val_train, num_classes, tag='conv'):
         """
         External Trust Calculator using Bayes (CM3 in the paper)
         :param x_train: features in the train set
         :param tag: tagstring to initialize autoencoder
         """
-        self.trust_calculators.append(ReconstructionLoss(dataloader=x_train,num_classes=num_classes, enc_tag=tag))
+        self.trust_calculators.append(ReconstructionLoss(dataloader=x_train,val_train = val_train,num_classes=num_classes, enc_tag=tag))
 
     def predict_set_misclassifications(self, data_set, classifier, y_proba=None, verbose=True, as_pandas=True):
         trust_set = self.compute_set_trust(data_set, classifier, y_proba, verbose, as_pandas)
